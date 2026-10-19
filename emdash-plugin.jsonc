@@ -1,0 +1,21 @@
+{
+	"$schema": "./node_modules/@emdash-cms/plugin-cli/schemas/emdash-plugin.schema.json",
+
+	"slug": "readable-resume",
+	"publisher": "did:plc:aaaaaaaaaaaaaaaaaaaaaaaa",
+
+	"license": "MIT",
+	"author": { "name": "ReadableResume", "url": "https://readableresume.com" },
+	"security": { "email": "templates@readableresume.com" },
+	"description": "Write your resume in the admin and publish it as a page on your site.",
+	"repo": "https://github.com/supertj/emdash-readable-resume",
+
+	// Trust contract — what runtime APIs the plugin asks for.
+	// Empty arrays mean no extra privileges beyond logging,
+	// KV, and route/hook registration. Changing these between
+	// releases requires a version bump because installed
+	// users have consented to the old contract.
+	"capabilities": [],
+	"allowedHosts": [],
+	"storage": {}
+}
