@@ -127,6 +127,23 @@ describe("parseInline", () => {
 		expect(inlineText("2 \\* 3 and `code`")).toBe("2 * 3 and code");
 	});
 
+	it("reads link destinations with parentheses and keeps literal asterisks in labels", () => {
+		expect(parseInline("[Paper](https://example.com/a_(b)) and more")).toEqual([
+			{ text: "Paper", marks: [], href: "https://example.com/a_(b)" },
+			{ text: " and more", marks: [] },
+		]);
+		expect(parseInline("[x](https://example.com/\\(y)")).toEqual([
+			{ text: "x", marks: [], href: "https://example.com/(y" },
+		]);
+		expect(parseInline("[C*-algebras](https://example.com)")).toEqual([
+			{ text: "C*-algebras", marks: [], href: "https://example.com/" },
+		]);
+		expect(parseInline("[a](https://example.com/b c)")).toEqual([
+			{ text: "[a](https://example.com/b c)", marks: [] },
+		]);
+		expect(parseInline("[a]()")).toEqual([{ text: "[a]()", marks: [] }]);
+	});
+
 	it("only allows web and email links", () => {
 		expect(safeHref("https://a.example")).toBe("https://a.example/");
 		expect(safeHref("mailto:a@b.co")).toBe("mailto:a@b.co");

@@ -35,7 +35,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 async function loadPageStatus(ctx: PluginContext): Promise<PageStatus | undefined> {
 	const pageId = await ctx.kv.get<string>(KV_PAGE_ID);
 	if (!pageId || !ctx.content) return undefined;
-	const page = await ctx.content.get(COLLECTION, pageId);
+	let page;
+	try {
+		page = await ctx.content.get(COLLECTION, pageId);
+	} catch (error) {
+		// The collection can be renamed or removed after the page was made.
+		// The form must still open so the resume text isn't stranded.
+		ctx.log.warn("Could not read the resume page", { error: String(error) });
+		return undefined;
+	}
 	if (!page) return undefined;
 	const hasUnpublishedChanges =
 		page.status === "published" && !!page.draftRevisionId && page.draftRevisionId !== page.liveRevisionId;
@@ -71,7 +79,7 @@ async function save(ctx: PluginContext, resumeText: string) {
 		return renderAdminPage({
 			resume: size <= MAX_FORM_ECHO_BYTES ? resumeText : fallback,
 			page: await loadPageStatus(ctx),
-			error: "The resume is too long to save. The limit is about 30,000 characters, several times a two-page resume.",
+			error: "The resume is over the 32,000-byte limit. Shorten it and save again.",
 		});
 	}
 	await ctx.kv.set(KV_RESUME, resumeText);
@@ -82,7 +90,7 @@ async function save(ctx: PluginContext, resumeText: string) {
 	}
 
 	const content = ctx.content;
-	if (!content?.create || !content.update) {
+	if (!content?.create || !content.update || !content.delete) {
 		// Only possible if a site runs the plugin without the capability it declares.
 		return renderAdminPage({
 			resume: resumeText,
@@ -92,16 +100,27 @@ async function save(ctx: PluginContext, resumeText: string) {
 	}
 
 	const { title, content: body } = toPortableText(parsed.resume);
+	const fields = { title, content: body };
 	let created = false;
 	try {
-		const existingId = await ctx.kv.get<string>(KV_PAGE_ID);
-		const existing = existingId ? await content.get(COLLECTION, existingId) : null;
+		const stored = await ctx.kv.getVersioned<string>(KV_PAGE_ID);
+		const existing = stored?.value ? await content.get(COLLECTION, stored.value) : null;
 		if (existing) {
-			await content.update(COLLECTION, existing.id, { title, content: body });
+			await content.update(COLLECTION, existing.id, fields);
 		} else {
-			const page = await content.create(COLLECTION, { title, content: body });
-			await ctx.kv.set(KV_PAGE_ID, page.id);
-			created = true;
+			const page = await content.create(COLLECTION, fields);
+			// The admin doesn't disable Save while a request is running, so a
+			// double click can send two first saves at once. Only the save that
+			// still sees the page ID it read gets to record its page; the other
+			// moves its copy to the trash and writes to the recorded page.
+			const claim = await ctx.kv.compareAndSet(KV_PAGE_ID, stored?.revision ?? null, page.id);
+			if (claim.applied) {
+				created = true;
+			} else {
+				await content.delete(COLLECTION, page.id);
+				const winnerId = await ctx.kv.get<string>(KV_PAGE_ID);
+				if (winnerId) await content.update(COLLECTION, winnerId, fields);
+			}
 		}
 	} catch (error) {
 		ctx.log.error("Could not write the resume page", { error: String(error) });
@@ -112,12 +131,17 @@ async function save(ctx: PluginContext, resumeText: string) {
 		});
 	}
 
+	// Word the message from the page's state after the write, not from what
+	// the plugin expected: on a collection without revisions an update goes
+	// straight to the live page.
 	const page = await loadPageStatus(ctx);
 	const message = created
 		? "Saved. The page is a draft until you publish it."
-		: page?.published
+		: page?.hasUnpublishedChanges
 			? "Saved. Publish the page to put the changes live."
-			: "Saved.";
+			: page?.published
+				? "Saved. The live page is updated."
+				: "Saved.";
 	return { ...renderAdminPage({ resume: resumeText, page }), toast: { message, type: "success" as const } };
 }
 

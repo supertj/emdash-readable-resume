@@ -24,13 +24,13 @@ Providence, RI | <olivia.bennett@example.com>
 
 
 /** Same collection shape as the Blog, Starter and Portfolio templates. */
-async function createHost(withPages = true) {
+async function createHost(withPages = true, revisions = true) {
 	const runtime = await createPluginRuntimeTestHost();
 	if (withPages) {
 		await runtime.fixtures.collection({
 			slug: "pages",
 			label: "Pages",
-			supports: ["drafts", "revisions"],
+			supports: revisions ? ["drafts", "revisions"] : ["drafts"],
 			urlPattern: "/{slug}",
 			fields: [
 				{ slug: "title", label: "Title", type: "string", required: true },
@@ -132,6 +132,42 @@ describe("resume admin page", () => {
 		const live = await runtime.inspect.content.get("pages", page.id);
 		expect(live?.status).toBe("published");
 		expect(texts(live?.data.content)).toContain("Harlan Quay Capital Partners | New York, NY");
+	});
+
+	it("says the live page changed when Pages keep no revisions", async () => {
+		const { runtime, admin } = await createHost(true, false);
+		host = runtime;
+		await runtime.admin.submit("/resume", "save", { resume: RESUME }, { user: admin });
+		const [page] = await runtime.inspect.content.list("pages");
+		await runtime.actions.content.publish("pages", page.id, {});
+
+		const response = await runtime.admin.submit(
+			"/resume",
+			"save",
+			{ resume: RESUME.replace("New York, NY", "Boston, MA") },
+			{ user: admin },
+		);
+		expect(response.toast?.message).toBe("Saved. The live page is updated.");
+		const [summary] = find<{ text: string }>(response.blocks, "section");
+		expect(summary.text).toBe("Your resume page is live on your site.");
+		const live = await runtime.inspect.content.get("pages", page.id);
+		expect(texts(live?.data.content)).toContain("Harlan Quay Capital Partners | Boston, MA");
+	});
+
+	it("ends up with one page when two first saves arrive together", async () => {
+		const { runtime, admin } = await createHost();
+		host = runtime;
+		await Promise.all([
+			runtime.admin.submit("/resume", "save", { resume: RESUME }, { user: admin }),
+			runtime.admin.submit("/resume", "save", { resume: RESUME }, { user: admin }),
+		]);
+		const pageId = await runtime.inspect.kv.get<string>("state:pageId");
+		const pages = await runtime.inspect.content.list("pages");
+		const kept = [];
+		for (const page of pages) {
+			if (await runtime.inspect.content.get("pages", page.id)) kept.push(page.id);
+		}
+		expect(kept).toEqual([pageId]);
 	});
 
 	it("keeps a slug the owner changed in the page editor", async () => {

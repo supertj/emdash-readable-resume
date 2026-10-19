@@ -118,11 +118,11 @@ The page uses your theme's fonts, colors and spacing. A sandboxed plugin can't
 add styles to the public site, so the place and dates follow a bar on the same
 line instead of sitting on the right margin the way they do in the PDF layout.
 
-Printing the page is up to your theme. Many themes print their header and
-footer as well, and a site's type is larger than a resume's, so the printout
-runs longer than one page. When you need a one-page PDF, ReadableResume has
-the [Classic template](https://readableresume.com/templates/classic) for
-Google Docs and Word.
+Your theme decides how the page prints. The Blog template, for example,
+prints its header and footer too, so check the print preview. When you need a
+one-page PDF, the same layout is the free
+[Classic template](https://readableresume.com/templates/classic) for Google
+Docs and Word on ReadableResume.
 
 ## What it stores
 

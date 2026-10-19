@@ -20,7 +20,7 @@ type Token =
 	| { type: "delim"; mark: Mark; raw: string; partner?: number }
 	| { type: "link"; label: string; href: string };
 
-const LINK = /^\[([^\]]+)\]\(([^)\s]+)\)/;
+const LINK_LABEL = /^\[([^\]]+)\]\(/;
 const AUTOLINK = /^<([^<>\s]+)>/;
 // No colon or slash, so "mailto:a@b.co" and URLs with an @ in the path go through URL parsing instead.
 const EMAIL = /^[^@\s<>():/]+@[^@\s<>():/]+\.[a-z]{2,}$/i;
@@ -35,6 +35,39 @@ export function safeHref(raw: string): string | undefined {
 		}
 	} catch {
 		// Not an absolute URL.
+	}
+	return undefined;
+}
+
+/**
+ * Reads [label](destination) at the start of `source`. The destination may
+ * contain balanced or backslash-escaped parentheses, as in
+ * https://example.com/wiki/Mercury_(planet), and no spaces.
+ */
+function readLink(source: string): { label: string; destination: string; length: number } | undefined {
+	const label = LINK_LABEL.exec(source);
+	if (!label) return undefined;
+	let depth = 0;
+	let destination = "";
+	for (let index = label[0].length; index < source.length; index++) {
+		const char = source[index];
+		if (char === "\\" && (source[index + 1] === "(" || source[index + 1] === ")")) {
+			destination += source[index + 1];
+			index++;
+		} else if (/\s/.test(char)) {
+			return undefined;
+		} else if (char === "(") {
+			depth++;
+			destination += char;
+		} else if (char === ")") {
+			if (depth === 0) {
+				return destination ? { label: label[1], destination, length: index + 1 } : undefined;
+			}
+			depth--;
+			destination += char;
+		} else {
+			destination += char;
+		}
 	}
 	return undefined;
 }
@@ -65,12 +98,12 @@ function tokenize(source: string): Token[] {
 			continue;
 		}
 		if (char === "[") {
-			const link = LINK.exec(rest);
-			const href = link && safeHref(link[2]);
+			const link = readLink(rest);
+			const href = link && safeHref(link.destination);
 			if (link && href) {
 				flush();
-				tokens.push({ type: "link", label: link[1], href });
-				index += link[0].length;
+				tokens.push({ type: "link", label: link.label, href });
+				index += link.length;
 				continue;
 			}
 		}
@@ -141,8 +174,9 @@ export function parseInline(source: string): InlineRun[] {
 		if (token.type === "text") {
 			push(token.text);
 		} else if (token.type === "link") {
-			// Formatting inside link text is rare on a resume; keep the label as typed.
-			push(stripInlineMarkers(token.label), token.href);
+			// Bold or italic inside link text is rare on a resume, so the link
+			// keeps only the label's text, read with the same delimiter rules.
+			push(inlineText(token.label), token.href);
 		} else if (token.partner === undefined) {
 			push(token.raw);
 		} else if (token.partner > index) {
@@ -153,10 +187,6 @@ export function parseInline(source: string): InlineRun[] {
 		}
 	});
 	return runs;
-}
-
-function stripInlineMarkers(text: string): string {
-	return text.replace(/\*\*|[*`]/g, "");
 }
 
 function sameMarks(a: Mark[], b: Mark[]): boolean {

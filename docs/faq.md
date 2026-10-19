@@ -4,7 +4,7 @@ Sandboxed plugins can't add styles to the public site, so the plugin writes plai
 
 ### Will it print as a one-page resume?
 
-Printing is up to your theme. Many themes print their header and footer too, and site type is larger than resume type. For a one-page PDF, the same layout is a free Google Docs and Word template on ReadableResume.
+Your theme decides how the page prints. The Blog template, for example, prints its header and footer too, so check the print preview. For a one-page PDF, the same layout is the free Classic template for Google Docs and Word on ReadableResume.
 
 ### What happens if I edit the page in the editor?
 

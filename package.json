@@ -30,7 +30,7 @@
 		"release:setup": "emdash-plugin release setup"
 	},
 	"peerDependencies": {
-		"emdash": ">=0.12.0"
+		"emdash": ">=1.3.0"
 	},
 	"devDependencies": {
 		"@emdash-cms/blocks": "1.3.1",
