@@ -18,6 +18,8 @@
  * merge a skills list into one run-on line.
  */
 
+import { inlineText } from "./inline.js";
+
 export type ResumeLine =
 	| { kind: "section"; text: string }
 	| { kind: "entry"; text: string; right: string }
@@ -67,13 +69,18 @@ export function parseResume(source: string): ParseResult {
 				};
 			}
 			name = heading[2].trim();
+			// The name becomes the page title, which can't be empty; "# ****"
+			// passes the check above but has no text once the Markdown is read.
+			if (!inlineText(name).trim()) {
+				return { ok: false, error: "Your name line has no text after the #. Write it like: # Jane Doe" };
+			}
 			continue;
 		}
 
 		if (heading) {
 			const level = heading[1].length;
 			const content = heading[2].trim();
-			if (!content) continue;
+			if (!inlineText(content).trim()) continue;
 			if (level <= 2) {
 				lines.push({ kind: "section", text: content });
 			} else if (level === 3) {

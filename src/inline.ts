@@ -15,10 +15,16 @@ export interface InlineRun {
 	href?: string;
 }
 
-type Token =
-	| { type: "text"; text: string }
-	| { type: "delim"; mark: Mark; raw: string; partner?: number }
-	| { type: "link"; label: string; href: string };
+type Delimiter = {
+	type: "delim";
+	mark: Mark;
+	raw: string;
+	canOpen: boolean;
+	canClose: boolean;
+	partner?: number;
+};
+
+type Token = { type: "text"; text: string } | Delimiter | { type: "link"; label: string; href: string };
 
 const LINK_LABEL = /^\[([^\]]+)\]\(/;
 const AUTOLINK = /^<([^<>\s]+)>/;
@@ -72,8 +78,27 @@ function readLink(source: string): { label: string; destination: string; length:
 	return undefined;
 }
 
-function isWordChar(char: string | undefined): boolean {
-	return char !== undefined && /[\p{L}\p{N}]/u.test(char);
+const isSpace = (char: string) => /\s/u.test(char);
+const isPunctuation = (char: string) => /[\p{P}\p{S}]/u.test(char);
+
+/**
+ * CommonMark's flanking rules, which decide whether a * or _ run can open
+ * or close emphasis. They keep the asterisk in "C*-algebras" literal instead
+ * of pairing it with one later in the line, and an underscore inside a word
+ * (snake_case) is never emphasis.
+ */
+function flanking(source: string, start: number, length: number, raw: string) {
+	const before = source[start - 1] ?? " ";
+	const after = source[start + length] ?? " ";
+	const left = !isSpace(after) && (!isPunctuation(after) || isSpace(before) || isPunctuation(before));
+	const right = !isSpace(before) && (!isPunctuation(before) || isSpace(after) || isPunctuation(after));
+	if (raw === "_") {
+		return {
+			canOpen: left && (!right || isPunctuation(before)),
+			canClose: right && (!left || isPunctuation(after)),
+		};
+	}
+	return { canOpen: left, canClose: right };
 }
 
 function tokenize(source: string): Token[] {
@@ -117,17 +142,16 @@ function tokenize(source: string): Token[] {
 				continue;
 			}
 		}
-		if (rest.startsWith("**")) {
+		if (char === "*" || char === "_") {
+			const raw = char === "*" && source[index + 1] === "*" ? "**" : char;
 			flush();
-			tokens.push({ type: "delim", mark: "strong", raw: "**" });
-			index += 2;
-			continue;
-		}
-		if (char === "*" || (char === "_" && !(isWordChar(source[index - 1]) && isWordChar(source[index + 1])))) {
-			// An underscore inside a word (snake_case, file_name) is text, as in CommonMark.
-			flush();
-			tokens.push({ type: "delim", mark: "em", raw: char });
-			index += 1;
+			tokens.push({
+				type: "delim",
+				mark: raw === "**" ? "strong" : "em",
+				raw,
+				...flanking(source, index, raw.length, raw),
+			});
+			index += raw.length;
 			continue;
 		}
 		buffer += char;
@@ -137,19 +161,26 @@ function tokenize(source: string): Token[] {
 	return tokens;
 }
 
-/** Pairs each opening delimiter with the next one of the same kind. */
+/**
+ * Pairs a delimiter that can close with the nearest open one of the same
+ * kind. Openers in between stay open, so "**a *b***" (which the tokenizer
+ * splits as ** and *) still closes both.
+ */
 function pairDelimiters(tokens: Token[]): void {
-	const open = new Map<string, number>();
+	const openers: number[] = [];
 	tokens.forEach((token, index) => {
 		if (token.type !== "delim") return;
-		const opener = open.get(token.raw);
-		if (opener === undefined) {
-			open.set(token.raw, index);
-			return;
+		if (token.canClose) {
+			for (let position = openers.length - 1; position >= 0; position--) {
+				const opener = tokens[openers[position]] as Delimiter;
+				if (opener.raw !== token.raw) continue;
+				opener.partner = index;
+				token.partner = openers[position];
+				openers.splice(position, 1);
+				return;
+			}
 		}
-		(tokens[opener] as Extract<Token, { type: "delim" }>).partner = index;
-		token.partner = opener;
-		open.delete(token.raw);
+		if (token.canOpen) openers.push(index);
 	});
 }
 

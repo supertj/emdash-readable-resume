@@ -200,6 +200,21 @@ describe("resume admin page", () => {
 		await expect(runtime.inspect.content.list("pages")).resolves.toHaveLength(0);
 	});
 
+	it("keeps the page's title when the new name line has no text", async () => {
+		const { runtime, admin } = await createHost(true, false);
+		host = runtime;
+		await runtime.admin.submit("/resume", "save", { resume: RESUME }, { user: admin });
+		const response = await runtime.admin.submit(
+			"/resume",
+			"save",
+			{ resume: RESUME.replace("# Olivia Bennett", "# ****") },
+			{ user: admin },
+		);
+		expect(find(response.blocks, "banner")).toHaveLength(1);
+		const [page] = await runtime.inspect.content.list("pages");
+		expect(page.data.title).toBe("Olivia Bennett");
+	});
+
 	it("refuses text longer than the limit without storing it", async () => {
 		const { runtime, admin } = await createHost();
 		host = runtime;

@@ -67,6 +67,9 @@ describe("parseResume", () => {
 		expect(parseResume("Jane Doe\n## Experience")).toMatchObject({ ok: false });
 		expect(parseResume("## Jane Doe")).toMatchObject({ ok: false });
 		expect(parseResume("#Jane Doe")).toMatchObject({ ok: false });
+		// Markdown with no text in it would leave the page without a title.
+		expect(parseResume("# ****")).toMatchObject({ ok: false });
+		expect(parseResume("# ``\n## Experience")).toMatchObject({ ok: false });
 	});
 
 	it("handles Windows line endings, rules, other bullet markers and stray right text", () => {
@@ -125,6 +128,28 @@ describe("parseInline", () => {
 		expect(parseInline("[x](javascript:alert(1))")).toEqual([{ text: "[x](javascript:alert(1))", marks: [] }]);
 		expect(parseInline("<not a link>")).toEqual([{ text: "<not a link>", marks: [] }]);
 		expect(inlineText("2 \\* 3 and `code`")).toBe("2 * 3 and code");
+	});
+
+	it("follows the flanking rules, so a literal asterisk doesn't pair with a later one", () => {
+		expect(parseInline("C*-algebras and *SQL*")).toEqual([
+			{ text: "C*-algebras and ", marks: [] },
+			{ text: "SQL", marks: ["em"] },
+		]);
+		expect(parseInline("a * b and *c*")).toEqual([
+			{ text: "a * b and ", marks: [] },
+			{ text: "c", marks: ["em"] },
+		]);
+		expect(parseInline("_lead_ and snake_case_name")).toEqual([
+			{ text: "lead", marks: ["em"] },
+			{ text: " and snake_case_name", marks: [] },
+		]);
+		// As in CommonMark (and Typora), a closing ** after punctuation needs a
+		// space after it; the format guide shows "**Technical:** Excel".
+		expect(inlineText("**Skills:**Excel")).toBe("**Skills:**Excel");
+		expect(parseInline("**Skills:** Excel")).toEqual([
+			{ text: "Skills:", marks: ["strong"] },
+			{ text: " Excel", marks: [] },
+		]);
 	});
 
 	it("reads link destinations with parentheses and keeps literal asterisks in labels", () => {
