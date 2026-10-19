@@ -2,8 +2,7 @@
 	"$schema": "./node_modules/@emdash-cms/plugin-cli/schemas/emdash-plugin.schema.json",
 
 	"slug": "readable-resume",
-	// Placeholder. Replace with the DID that `emdash-plugin whoami` prints after login.
-	"publisher": "did:plc:aaaaaaaaaaaaaaaaaaaaaaaa",
+	"publisher": "did:plc:jgndirqpk63jpom2sagwc7a4", // readableresume.com
 
 	"license": "MIT",
 	"author": { "name": "ReadableResume", "url": "https://readableresume.com" },
