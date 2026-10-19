@@ -1,0 +1,2 @@
+# Keep the generated lockfile out of text diffs and reviews.
+pnpm-lock.yaml -diff linguist-generated
