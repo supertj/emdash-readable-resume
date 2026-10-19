@@ -2,20 +2,42 @@
 	"$schema": "./node_modules/@emdash-cms/plugin-cli/schemas/emdash-plugin.schema.json",
 
 	"slug": "readable-resume",
+	// Placeholder. Replace with the DID that `emdash-plugin whoami` prints after login.
 	"publisher": "did:plc:aaaaaaaaaaaaaaaaaaaaaaaa",
 
 	"license": "MIT",
 	"author": { "name": "ReadableResume", "url": "https://readableresume.com" },
 	"security": { "email": "templates@readableresume.com" },
+	"name": "Readable Resume",
 	"description": "Write your resume in the admin and publish it as a page on your site.",
+	"keywords": ["resume", "cv", "portfolio", "personal site"],
+	"sections": {
+		"description": { "file": "./docs/overview.md" },
+		"installation": { "file": "./docs/installation.md" },
+		"faq": { "file": "./docs/faq.md" },
+	},
 	"repo": "https://github.com/supertj/emdash-readable-resume",
 
-	// Trust contract — what runtime APIs the plugin asks for.
-	// Empty arrays mean no extra privileges beyond logging,
-	// KV, and route/hook registration. Changing these between
-	// releases requires a version bump because installed
-	// users have consented to the old contract.
-	"capabilities": [],
+	// Trust contract. The plugin writes one page into the Pages collection
+	// and nothing else: no network, no media, no publishing on its own
+	// (the site owner publishes the page from the editor).
+	"capabilities": ["content:write"],
 	"allowedHosts": [],
-	"storage": {}
+	"storage": {},
+
+	"admin": {
+		"pages": [{ "path": "/resume", "label": "Resume", "icon": "document" }],
+	},
+
+	"release": {
+		// Tested on EmDash 1.3.1 only, so older releases aren't offered it.
+		"requires": { "env:emdash": ">=1.3.0" },
+		"artifacts": {
+			"icon": { "file": "./images/icon.png" },
+			"screenshots": [
+				{ "file": "./images/page.png", "lang": "en" },
+				{ "file": "./images/admin.png", "lang": "en" },
+			],
+		},
+	},
 }
