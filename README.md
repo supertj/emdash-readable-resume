@@ -13,6 +13,10 @@ The page is one column of headings, paragraphs and bullets in the order you
 read them. Nothing is an image or a table, so the text copies cleanly and a
 screen reader goes through it top to bottom.
 
+The same Classic layout is also available as a
+[LibreOffice Writer template](https://extensions.libreoffice.org/en/extensions/show/99679)
+and as the [atsresume LaTeX class on CTAN](https://ctan.org/pkg/atsresume).
+
 ## What it needs
 
 - EmDash 1.3 or later. It was tested on 1.3.1.
